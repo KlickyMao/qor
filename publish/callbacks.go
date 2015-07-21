@@ -17,10 +17,6 @@ func isDraftMode(scope *gorm.Scope) bool {
 
 func setTableAndPublishStatus(ensureDraftMode bool) func(*gorm.Scope) {
 	return func(scope *gorm.Scope) {
-		if scope.Value == nil {
-			return
-		}
-
 		if isPublishableModel(scope.Value) {
 			scope.InstanceSet("publish:supported_model", true)
 
@@ -28,9 +24,22 @@ func setTableAndPublishStatus(ensureDraftMode bool) func(*gorm.Scope) {
 				scope.Set("publish:force_draft_mode", true)
 				scope.Search.Table(draftTableName(scope.TableName()))
 			}
+		}
+	}
+}
 
-			if isDraftMode(scope) && ensureDraftMode {
-				scope.SetColumn("PublishStatus", DIRTY)
+func setPublishStatusColumnToDirty(scope *gorm.Scope) {
+	if isPublishableModel(scope.Value) && isDraftMode(scope) {
+		scope.SetColumn("PublishStatus", DIRTY)
+	}
+}
+
+// only set publish status to dirty if there are updates
+func updateDraftTablePublishStatusToDirty(scope *gorm.Scope) {
+	if isPublishableModel(scope.Value) && isDraftMode(scope) {
+		if t, ok := scope.DB().Get("publish:updating_publish_status"); !ok || !t.(bool) {
+			if scope.DB().RowsAffected > 0 {
+				scope.DB().Set("publish:updating_publish_status", true).Where("publish_status = ?", PUBLISHED).UpdateColumn("publish_status", DIRTY)
 			}
 		}
 	}

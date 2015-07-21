@@ -106,6 +106,7 @@ func New(db *gorm.DB) *Publish {
 	}
 
 	db.Callback().Create().Before("gorm:begin_transaction").Register("publish:set_table_to_draft", setTableAndPublishStatus(true))
+	db.Callback().Create().After("publish:set_table_to_draft").Register("publish:set_publish_status_to_dirty", setPublishStatusColumnToDirty)
 	db.Callback().Create().Before("gorm:commit_or_rollback_transaction").
 		Register("publish:sync_to_production_after_create", syncToProductionAfterCreate)
 
@@ -117,6 +118,7 @@ func New(db *gorm.DB) *Publish {
 	db.Callback().Update().Before("gorm:begin_transaction").Register("publish:set_table_to_draft", setTableAndPublishStatus(true))
 	db.Callback().Update().Before("gorm:commit_or_rollback_transaction").
 		Register("publish:sync_to_production", syncToProductionAfterUpdate)
+	db.Callback().Update().After("gorm:commit_or_rollback_transaction").Register("publish:set_publish_status_to_dirty", updateDraftTablePublishStatusToDirty)
 
 	db.Callback().RowQuery().Register("publish:set_table_in_draft_mode", setTableAndPublishStatus(false))
 	db.Callback().Query().Before("gorm:query").Register("publish:set_table_in_draft_mode", setTableAndPublishStatus(false))
